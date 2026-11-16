@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="lv">
+<head>
+  <meta charset="utf-8">
+  <title>SH | Kaisāmmateriāls</title>
+  <!-- Ietvara lapa: rāda Apps Script lietotni pa visu ekrānu, bez baltām joslām augšā un apakšā.
+       © VAITKEVIX, SIA. Visas tiesības aizsargātas. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f6b5c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Kaisāmmateriāls">
+  <link rel="apple-touch-icon" href="icon.png">
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; }
+    body { background: #0f6b5c; }
+    iframe {
+      position: fixed;
+      left: 0; right: 0;
+      top: env(safe-area-inset-top, 0px);
+      bottom: 0;
+      width: 100%;
+      height: calc(100% - env(safe-area-inset-top, 0px));
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <iframe
+    id="app"
+    title="SH | Kaisāmmateriāls"
+    allow="geolocation; clipboard-write; web-share"></iframe>
+  <script>
+    // IELIEC ŠEIT kaisāmmateriāla Apps Script Web app saiti (beidzas ar /exec)
+    var APP = "IELIEC_EXEC_SAITI_SEIT";
+    // Saite ?id=... atver konkrētu pieteikumu
+    var id = new URLSearchParams(location.search).get("id");
+    document.getElementById("app").src = APP + (id ? "?id=" + encodeURIComponent(id) : "");
+  </script>
+</body>
+</html>
