@@ -32,8 +32,7 @@
     title="SH | Kaisāmmateriāls"
     allow="geolocation; clipboard-write; web-share"></iframe>
   <script>
-    // IELIEC ŠEIT kaisāmmateriāla Apps Script Web app saiti (beidzas ar /exec)
-    var APP = "IELIEC_EXEC_SAITI_SEIT";
+    var APP = "https://script.google.com/macros/s/AKfycbyEttChYy6oM5bejr0bHFJMNGbWe7NxYONc5fMflWXwGGrs-NqTUhseD0hOZO5lvdd7/exec";
     // Saite ?id=... atver konkrētu pieteikumu
     var id = new URLSearchParams(location.search).get("id");
     document.getElementById("app").src = APP + (id ? "?id=" + encodeURIComponent(id) : "");
