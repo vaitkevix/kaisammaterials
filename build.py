@@ -139,3 +139,10 @@ window.checkCarrierPin = function () {
 app = open('index.html', encoding='utf-8').read().replace('</body>', shx + '</body>', 1)
 open('index.html', 'w', encoding='utf-8').write(app)
 print('SHX', ver)
+
+# SH kopīgā tēma (sh-theme.css) — vienots izskats ar SH portālu
+import re as _re
+_s = open('index.html', encoding='utf-8').read()
+_s = _re.sub(r'\n?<!--SH-THEME-->.*?<!--/SH-THEME-->', '', _s, flags=_re.S)
+_s = _s.replace('</head>', '\n<!--SH-THEME--><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap"><link rel="stylesheet" href="sh-theme.css?v=1"><script>document.documentElement.setAttribute("data-sh","kais")</script><!--/SH-THEME-->\n</head>', 1)
+open('index.html', 'w', encoding='utf-8').write(_s)
