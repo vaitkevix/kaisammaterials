@@ -330,7 +330,7 @@ function completeTask(data) {
 //  Lietotne (GitHub) → Cloudflare Worker → šeit. Google tabula paliek galvenā.
 //  Script properties: BRIDGE_KEY (tā pati atslēga, kas Cloudflare).
 // ================================================================
-const BRIDGE_MAP_ = { getTasks: getTasks, getInitialData: getInitialData, saveTask: saveTask, completeTask: completeTask, saveFileToDrive: saveFileToDrive, courierByPassword: courierByPassword };
+const BRIDGE_MAP_ = { getTasks: getTasks, getInitialData: getInitialData, saveTask: saveTask, completeTask: completeTask, saveFileToDrive: saveFileToDrive, courierByPassword: courierByPassword, whoByPassword: whoByPassword };
 
 function doPost(e) {
   const out = (o) => ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
@@ -346,3 +346,47 @@ function doPost(e) {
     return out({ ok: false, error: String(err && err.message || err) });
   }
 }
+
+// ================================================================
+//  PIESLĒGŠANĀS AR PAROLI (pasūtītāji un izvedēji/kurjeri). © VAITKEVIX, SIA
+//  Paroles glabājas kolonnā "Parole" attiecīgajā lapā.
+// ================================================================
+function pwCol_(sh, create) {
+  const lc = Math.max(1, sh.getLastColumn());
+  const head = sh.getRange(1, 1, 1, lc).getValues()[0].map(h => String(h).trim());
+  const c = head.findIndex(h => /^parole/i.test(h));
+  if (c >= 0 || !create) return c;
+  sh.getRange(1, lc + 1).setValue('Parole').setFontWeight('bold');
+  return lc;
+}
+function pwRows_(name) {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+  if (!sh || sh.getLastRow() < 2) return [];
+  const c = pwCol_(sh, false); if (c < 0) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, c + 1).getValues()
+    .map(r => ({ name: String(r[0] || '').replace(/\s+/g, ' ').trim(), pass: String(r[c] || '').trim().toUpperCase() }))
+    .filter(x => x.name && x.pass);
+}
+/** Kas ir šīs paroles īpašnieks: { kind: 'pieteicejs' | 'kurjers', name } vai null */
+function whoByPassword(pw) {
+  const p = String(pw == null ? '' : pw).trim().toUpperCase(); if (!p) return null;
+  const req = pwRows_('Pasutitaji').filter(x => x.pass === p);
+  const car = pwRows_('Kurjeri').filter(x => x.pass === p);
+  if (req.length + car.length === 1) return req.length ? { kind: 'pieteicejs', name: req[0].name } : { kind: 'kurjers', name: car[0].name };
+  Utilities.sleep(800); return null;
+}
+function fillPw_(sheetName, digits) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet(), sh = ss.getSheetByName(sheetName);
+  if (!sh || sh.getLastRow() < 2) throw new Error('Lapā "' + sheetName + '" nav neviena ieraksta');
+  const c = pwCol_(sh, true);
+  const v = sh.getRange(2, 1, sh.getLastRow() - 1, c + 1).getValues();
+  const used = new Set(['Pasutitaji', 'Kurjeri'].map(pwRows_).flat().map(x => x.pass));
+  const abc = digits ? '0123456789' : 'ABCDEFGHJKLMNPRSTUVZ23456789', len = digits || 8; let n = 0;
+  const gen = () => { let x; do { x = ''; for (let i = 0; i < len; i++) x += abc[Math.floor(Math.random() * abc.length)]; } while (used.has(x) || x[0] === '0'); used.add(x); return x; };
+  v.forEach(r => { if (String(r[0]).trim() && !String(r[c]).trim()) { r[c] = gen(); n++; } });
+  sh.getRange(2, c + 1, v.length, 1).setNumberFormat('@').setValues(v.map(r => [r[c]]));
+  ss.toast('Paroles ieliktas: ' + n, sheetName);
+  return n;
+}
+/** Palaid no redaktora: pasūtītājiem bez paroles ieliek unikālu paroli */
+function aizpilditPasutitajuParoles() { return fillPw_('Pasutitaji', 6); }
