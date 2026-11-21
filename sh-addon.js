@@ -69,7 +69,7 @@
 
   /* ---------- Lietotājs ---------- */
   let U = null; try { U = JSON.parse(ls.get('user') || 'null'); } catch (e) {}
-  const SHX = window.SHXR = { user: () => U, startTour, logout, showMenu };
+  const SHX = window.SHXR = { user: () => U, startTour: () => startTour(), logout: () => logout(), showMenu: (c) => showMenu(c), maybeTour: () => maybeTour(), a2hs: () => C.a2hs && C.a2hs() };
 
   function gate() {
     if ($('shxGate')) return;
@@ -172,7 +172,10 @@
 
   /* ---------- Pamācība soli pa solim ---------- */
   let TOUR = null;
+  const cur = () => (C.getUser ? C.getUser() : U);
+  function maybeTour() { const u = cur(); if (u && !ls.get('tour_' + u.kind)) setTimeout(() => { if (!ls.get('tour_' + u.kind)) startTour(); }, 1200); }
   function startTour() {
+    const U = cur();
     if (!U || !C.tours || !C.tours[U.kind]) return;
     endTour(true);
     TOUR = { kind: U.kind, steps: C.tours[U.kind], i: 0 };
@@ -225,11 +228,11 @@
     const ov = $('tourOv'); if (ov) ov.remove();
     if (!TOUR) return;
     ls.set('tour_' + TOUR.kind, '1');
-    const back = C.homeTab && C.homeTab(U); TOUR = null;
+    const back = C.homeTab && C.homeTab(cur()); TOUR = null;
     if (!silent && back && C.switchTab) C.switchTab(back);
   }
   addEventListener('resize', () => { if (TOUR) go(TOUR.i); });
   addEventListener('keydown', (e) => { if (!TOUR) return; if (e.key === 'Escape') endTour(); if (e.key === 'ArrowRight') go(TOUR.i + 1); if (e.key === 'ArrowLeft') go(TOUR.i - 1, -1); });
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => apply(false)); else apply(false);
+  if (!C.external) { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => apply(false)); else apply(false); }
 })();
