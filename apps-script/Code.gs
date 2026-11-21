@@ -129,6 +129,24 @@ function courierByPassword(pw) {
   Utilities.sleep(800); return '';
 }
 
+/** Palaid vienreiz no redaktora: katram kurjeram bez paroles ieliek unikālu paroli (kolonna "Parole", lapa "Kurjeri") */
+function aizpilditKurjeruParoles() {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.couriers);
+  if (!sh || sh.getLastRow() < 2) throw new Error('Lapā "Kurjeri" nav kurjeru');
+  let lc = Math.max(1, sh.getLastColumn());
+  const head = sh.getRange(1, 1, 1, lc).getValues()[0].map(h => String(h).trim());
+  let c = head.findIndex(h => /^parole/i.test(h));
+  if (c < 0) { lc += 1; c = lc - 1; sh.getRange(1, lc).setValue('Parole').setFontWeight('bold'); }
+  const rng = sh.getRange(2, 1, sh.getLastRow() - 1, c + 1), v = rng.getValues();
+  const used = new Set(v.map(r => String(r[c]).trim().toUpperCase()).filter(Boolean));
+  const abc = 'ABCDEFGHJKLMNPRSTUVZ23456789'; let n = 0;
+  const gen = () => { let x; do { x = ''; for (let i = 0; i < 8; i++) x += abc[Math.floor(Math.random() * abc.length)]; } while (used.has(x)); used.add(x); return x; };
+  v.forEach(r => { if (String(r[0]).trim() && !String(r[c]).trim()) { r[c] = gen(); n++; } });
+  sh.getRange(2, c + 1, v.length, 1).setValues(v.map(r => [r[c]]));
+  SpreadsheetApp.getActiveSpreadsheet().toast('Paroles ieliktas: ' + n, 'Kurjeri');
+  return n;
+}
+
 // Pasūtītāju tālruņi: lapa "Pasutitaji", A = vārds, B = tālrunis
 function getPhones_() {
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.requesters);
