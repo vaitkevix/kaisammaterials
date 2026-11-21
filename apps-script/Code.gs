@@ -56,7 +56,7 @@ function safe_(fn) {
 
 // ---------- Vienreizēja uzstādīšana ----------
 function setupSheets() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = SS_();
 
   const make = (name, headers, examples) => {
     let sh = ss.getSheetByName(name);
@@ -108,7 +108,7 @@ function setupSheets() {
 
 // ---------- Saraksti formām ----------
 function getList_(name) {
-  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+  const sh = SS_().getSheetByName(name);
   if (!sh || sh.getLastRow() < 2) return [];
   return sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues()
     .map(r => String(r[0]).trim())
@@ -118,7 +118,7 @@ function getList_(name) {
 /** Pieslēgšanās tikai ar paroli: lapa "Kurjeri", kolonna "Parole" (izveido, ja nav). Atgriež kurjera nosaukumu */
 function courierByPassword(pw) {
   const p = String(pw == null ? '' : pw).trim().toUpperCase(); if (!p) return '';
-  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.couriers); if (!sh) return '';
+  const sh = SS_().getSheetByName(SHEETS.couriers); if (!sh) return '';
   const lc = Math.max(1, sh.getLastColumn());
   const head = sh.getRange(1, 1, 1, lc).getValues()[0].map(h => String(h).trim());
   let c = head.findIndex(h => /^parole/i.test(h));
@@ -131,7 +131,7 @@ function courierByPassword(pw) {
 
 /** Palaid vienreiz no redaktora: katram kurjeram bez paroles ieliek unikālu paroli (kolonna "Parole", lapa "Kurjeri") */
 function aizpilditKurjeruParoles() {
-  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.couriers);
+  const sh = SS_().getSheetByName(SHEETS.couriers);
   if (!sh || sh.getLastRow() < 2) throw new Error('Lapā "Kurjeri" nav kurjeru');
   let lc = Math.max(1, sh.getLastColumn());
   const head = sh.getRange(1, 1, 1, lc).getValues()[0].map(h => String(h).trim());
@@ -143,13 +143,13 @@ function aizpilditKurjeruParoles() {
   const gen = () => { let x; do { x = ''; for (let i = 0; i < 8; i++) x += abc[Math.floor(Math.random() * abc.length)]; } while (used.has(x)); used.add(x); return x; };
   v.forEach(r => { if (String(r[0]).trim() && !String(r[c]).trim()) { r[c] = gen(); n++; } });
   sh.getRange(2, c + 1, v.length, 1).setValues(v.map(r => [r[c]]));
-  SpreadsheetApp.getActiveSpreadsheet().toast('Paroles ieliktas: ' + n, 'Kurjeri');
+  SS_().toast('Paroles ieliktas: ' + n, 'Kurjeri');
   return n;
 }
 
 // Pasūtītāju tālruņi: lapa "Pasutitaji", A = vārds, B = tālrunis
 function getPhones_() {
-  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.requesters);
+  const sh = SS_().getSheetByName(SHEETS.requesters);
   const out = {};
   if (!sh || sh.getLastRow() < 2) return out;
   let rows = [];
@@ -196,7 +196,7 @@ function saveFileToDrive(base64Data, filename) {
 }
 
 function getTaskSheet_() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = SS_();
   let sh = ss.getSheetByName(SHEETS.tasks);
   if (!sh) {
     sh = ss.insertSheet(SHEETS.tasks);
@@ -255,7 +255,7 @@ function saveTask(taskData) {
 // ---------- Visi pieteikumi ----------
 function getTasks() {
   try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.tasks);
+    const sheet = SS_().getSheetByName(SHEETS.tasks);
     if (!sheet || sheet.getLastRow() < 2) return [];
 
     const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, NUM_COLS).getValues();
@@ -293,7 +293,7 @@ function completeTask(data) {
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(20000);
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.tasks);
+    const sheet = SS_().getSheetByName(SHEETS.tasks);
     if (!sheet) return { status: 'error', message: 'Lapa "' + SHEETS.tasks + '" netika atrasta' };
 
     const r = parseInt(data.rowIndex, 10);
@@ -360,7 +360,7 @@ function pwCol_(sh, create) {
   return lc;
 }
 function pwRows_(name) {
-  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+  const sh = SS_().getSheetByName(name);
   if (!sh || sh.getLastRow() < 2) return [];
   const c = pwCol_(sh, false); if (c < 0) return [];
   return sh.getRange(2, 1, sh.getLastRow() - 1, c + 1).getValues()
@@ -376,7 +376,7 @@ function whoByPassword(pw) {
   Utilities.sleep(800); return null;
 }
 function fillPw_(sheetName, digits) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet(), sh = ss.getSheetByName(sheetName);
+  const ss = SS_(), sh = ss.getSheetByName(sheetName);
   if (!sh || sh.getLastRow() < 2) throw new Error('Lapā "' + sheetName + '" nav neviena ieraksta');
   const c = pwCol_(sh, true);
   const v = sh.getRange(2, 1, sh.getLastRow() - 1, c + 1).getValues();
@@ -396,7 +396,7 @@ function aizpilditPasutitajuParoles() { return fillPw_('Pasutitaji', 6); }
 //  Portāls ir galvenais; šīs lapas tiek atjaunotas automātiski, lai lietotne strādā kā līdz šim.
 // ================================================================
 function sheetRaw_(name) {
-  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+  const sh = SS_().getSheetByName(name);
   return sh ? sh.getDataRange().getDisplayValues() : null;
 }
 /** Pirmajam importam: visas sarakstu lapas, kā tās ir */
@@ -408,7 +408,7 @@ function setLists(p) {
   finally { lock.releaseLock(); }
 }
 function setList_(name, spec) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = SS_();
   const sh = ss.getSheetByName(name) || ss.insertSheet(name);
   const cols = spec.cols || [], rows = spec.rows || [];
   let lc = Math.max(1, sh.getLastColumn());
@@ -430,6 +430,52 @@ function setList_(name, spec) {
   if (outRows.length) { sh.getRange(2, 1, outRows.length, lc).setNumberFormat('@').setValues(outRows); }
   return outRows.length;
 }
+
+
+// ================================================================
+//  VIENA TABULA «SH | Dati» — visas lietotnes, lapas pa sfērām. © VAITKEVIX, SIA
+//  Script property DATA_SS = galvenās tabulas ID. Ja nav — strādā ar savu tabulu (kā agrāk).
+// ================================================================
+const DATA_TARGET_ = '1mEKmDB9H1R9Vnp6if_CCq0_EtHE9gCuCZATScNd4B8w';
+const DATA_MAP_ = { 'Pieteikumi': 'Kaisāmmateriāls · Pieteikumi', 'Adreses': '⚙ Kaisām. Adreses', 'Pasutitaji': '⚙ Kaisām. Pasūtītāji', 'Kurjeri': '⚙ Kaisām. Kurjeri', 'Materiali': '⚙ Kaisām. Materiāli' };
+function SS_() {
+  if (SS_.c) return SS_.c;
+  const act = SpreadsheetApp.getActiveSpreadsheet();
+  const id = PropertiesService.getScriptProperties().getProperty('DATA_SS');
+  if (!id) return (SS_.c = act);
+  const real = act && act.getId() === id ? act : SpreadsheetApp.openById(id);
+  const nm = (n) => (typeof n === 'string' && DATA_MAP_[n]) ? DATA_MAP_[n] : n;
+  SS_.c = new Proxy(real, { get: (t, p) => {
+    if (p === 'getSheetByName') return (n) => t.getSheetByName(nm(n));
+    if (p === 'insertSheet') return (n, a, b) => { const sh = b !== undefined ? t.insertSheet(nm(n), a, b) : a !== undefined ? t.insertSheet(nm(n), a) : t.insertSheet(nm(n)); if (/^⚙/.test(nm(n))) sh.hideSheet(); return sh; };
+    const v = t[p]; return typeof v === 'function' ? (...a) => t[p](...a) : v;
+  } });
+  return SS_.c;
+}
+/** Palaid vienreiz no redaktora: pārceļ šīs lietotnes lapas uz «SH | Dati» un pārslēdz lietotni. Veco tabulu neaiztiek. */
+function parceltUzVienuTabulu() {
+  const lock = LockService.getScriptLock(); lock.waitLock(60000);
+  try {
+    const src = SpreadsheetApp.getActiveSpreadsheet(), log = [];
+    const same = src.getId() === DATA_TARGET_, dst = same ? src : SpreadsheetApp.openById(DATA_TARGET_);
+    src.getSheets().forEach(sh => {
+      const n = sh.getName(), to = DATA_MAP_[n];
+      if (!to) { log.push('paliek: ' + n); return; }
+      if (to === n) { log.push('jau: ' + n); return; }
+      if (dst.getSheetByName(to)) { log.push('jau ir: ' + to); return; }
+      const c = same ? sh.setName(to) : sh.copyTo(dst).setName(to);
+      if (/^⚙/.test(to)) c.hideSheet();
+      log.push(n + ' → ' + to + ' (' + sh.getLastRow() + ' rindas)');
+    });
+    if (same && dst.getName() !== 'SH | Dati') dst.rename('SH | Dati');
+    PropertiesService.getScriptProperties().setProperty('DATA_SS', DATA_TARGET_);
+    SpreadsheetApp.flush();
+    console.log(log.join('\n'));
+    return log;
+  } finally { lock.releaseLock(); }
+}
+/** Ja vajag atgriezt: lietotne atkal strādās ar savu veco tabulu */
+function atgrieztVecoTabulu() { PropertiesService.getScriptProperties().deleteProperty('DATA_SS'); }
 
 /** Inventārs: lapas, izmēri, formulas ar atsaucēm uz citām lapām (pārcelšanai uz vienu tabulu). © VAITKEVIX, SIA */
 function lapuInventars() {
