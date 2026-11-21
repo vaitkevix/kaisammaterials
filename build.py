@@ -59,7 +59,7 @@ print('index.html', len(app))
 import hashlib
 addon = open('sh-addon.js', encoding='utf-8').read()
 ver = hashlib.sha1(addon.encode()).hexdigest()[:8]
-shx = '''<script>
+shx = '''<style>@media(max-width:420px){.t-long{display:none}}@media(min-width:421px){.t-short{display:none}}</style><script>
 window.SHX = {
   app: 'kais', title: 'Jauns pieteikums', api: 'https://aizvietosana-api.vaitkevix.workers.dev', icon: 'icon.png',
   sub: 'Lai pieteiktu, ievadiet savu PIN kodu', hint: 'Tas pats PIN, kas Aizvietošanā.',
