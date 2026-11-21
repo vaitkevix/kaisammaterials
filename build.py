@@ -23,7 +23,8 @@ head = '''
   (function () {
     var API = '%s';
     function call(fn, args, ok, fail, uo) {
-      fetch(API + '?fn=' + encodeURIComponent(fn), { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(args) })
+      var t = ''; try { t = localStorage.getItem('sh_t') || ''; } catch (e) {}   // portāla sesija — mainīt var tikai ielogojies
+      fetch(API + '?fn=' + encodeURIComponent(fn) + (t ? '&t=' + encodeURIComponent(t) : ''), { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(args) })
         .then(function (r) { return r.json(); })
         .then(function (j) { if (j.notices) notices(j.notices); if (!j.ok) throw new Error(j.error || 'Kļūda'); if (ok) ok(j.result, uo); })
         .catch(function (e) { if (fail) fail(e, uo); else console.error(e); });
