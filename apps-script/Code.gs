@@ -330,7 +330,7 @@ function completeTask(data) {
 //  Lietotne (GitHub) → Cloudflare Worker → šeit. Google tabula paliek galvenā.
 //  Script properties: BRIDGE_KEY (tā pati atslēga, kas Cloudflare).
 // ================================================================
-const BRIDGE_MAP_ = { getTasks: getTasks, getInitialData: getInitialData, saveTask: saveTask, completeTask: completeTask, saveFileToDrive: saveFileToDrive, courierByPassword: courierByPassword, whoByPassword: whoByPassword };
+const BRIDGE_MAP_ = { getTasks: getTasks, getInitialData: getInitialData, saveTask: saveTask, completeTask: completeTask, saveFileToDrive: saveFileToDrive, courierByPassword: courierByPassword, whoByPassword: whoByPassword, getLists: getLists, setLists: setLists };
 
 function doPost(e) {
   const out = (o) => ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
@@ -390,3 +390,43 @@ function fillPw_(sheetName, digits) {
 }
 /** Palaid no redaktora: pasūtītājiem bez paroles ieliek unikālu paroli */
 function aizpilditPasutitajuParoles() { return fillPw_('Pasutitaji', 6); }
+
+// ================================================================
+//  PAMATDATI no SH portāla (adreses, cilvēki, uzņēmumi, saraksti). © VAITKEVIX, SIA
+//  Portāls ir galvenais; šīs lapas tiek atjaunotas automātiski, lai lietotne strādā kā līdz šim.
+// ================================================================
+function sheetRaw_(name) {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+  return sh ? sh.getDataRange().getDisplayValues() : null;
+}
+/** Pirmajam importam: visas sarakstu lapas, kā tās ir */
+function getLists() { const o = {}; ['Adreses', 'Pasutitaji', 'Kurjeri', 'Materiali'].forEach(n => o[n] = sheetRaw_(n)); return o; }
+/** p = { lapa: { cols: ['Adrese', 'Piekļuve'], rows: [[...]] } } — 1. kolonna ir atslēga (kolonna A), pārējās pēc virsraksta; citas kolonnas paliek */
+function setLists(p) {
+  const lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try { const out = {}; Object.keys(p || {}).forEach(n => out[n] = setList_(n, p[n])); SpreadsheetApp.flush(); return out; }
+  finally { lock.releaseLock(); }
+}
+function setList_(name, spec) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(name) || ss.insertSheet(name);
+  const cols = spec.cols || [], rows = spec.rows || [];
+  let lc = Math.max(1, sh.getLastColumn());
+  const head = sh.getRange(1, 1, 1, lc).getDisplayValues()[0].map(h => String(h).trim());
+  if (!head[0]) { head[0] = cols[0]; sh.getRange(1, 1).setValue(cols[0]).setFontWeight('bold'); }
+  const idx = [0];
+  for (let j = 1; j < cols.length; j++) {
+    let c = head.findIndex(h => h.toLowerCase() === String(cols[j]).toLowerCase());
+    if (c < 0) { c = head.length; head.push(cols[j]); sh.getRange(1, c + 1).setValue(cols[j]).setFontWeight('bold'); }
+    idx.push(c);
+  }
+  lc = head.length;
+  const norm = s => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const last = sh.getLastRow();
+  const cur = last > 1 ? sh.getRange(2, 1, last - 1, lc).getValues() : [];
+  const map = {}; cur.forEach(r => { const k = norm(r[0]); if (k && !map[k]) map[k] = r; });
+  const outRows = rows.map(r => { const b = (map[norm(r[0])] || new Array(lc).fill('')).slice(); while (b.length < lc) b.push(''); idx.forEach((c, j) => { b[c] = r[j] == null ? '' : r[j]; }); return b; });
+  if (last > 1) sh.getRange(2, 1, last - 1, lc).clearContent();
+  if (outRows.length) { sh.getRange(2, 1, outRows.length, lc).setNumberFormat('@').setValues(outRows); }
+  return outRows.length;
+}
