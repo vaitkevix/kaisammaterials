@@ -126,6 +126,8 @@ window.checkCarrierPin = function () {
   });
 };
 (function () {
+  if (location.hash === '#carrier') { var st = document.createElement('style'); st.textContent = '#tabs .tab[data-tab="new-task"],#tabs .tab[data-tab="analytics"]{display:none!important}'; document.head.appendChild(st);
+    setTimeout(function () { switchTab('carrier'); if (typeof moveTabInd === 'function') moveTabInd(); }, 60); }
   try { if (shxCourier()) { state.unlocked = true; } } catch (e) {}
   var cc = document.getElementById('carrierContainer'); if (cc) new MutationObserver(shxSia).observe(cc, { childList: true, subtree: true });
   var sd = window.setupDropdowns; if (sd) window.setupDropdowns = function () { var r = sd.apply(this, arguments); shxReq(SHXR.user()); return r; };
