@@ -105,12 +105,15 @@ function setupSheets() {
 }
 
 // ---------- Saraksti formām ----------
-function getList_(name) {
-  const sh = SS_().getSheetByName(name);
+function getList_(name) { return listCol1_(SS_().getSheetByName(name)); }
+/** 1. kolonna bez rindām, kuras portālā vairs nav (kolonna «Portālā» = nē) */
+function listCol1_(sh) {
   if (!sh || sh.getLastRow() < 2) return [];
-  return sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues()
-    .map(r => String(r[0]).trim())
-    .filter(Boolean);
+  const head = sh.getRange(1, 1, 1, sh.getLastColumn()).getDisplayValues()[0];
+  const m = head.findIndex(h => String(h).trim().toLowerCase() === 'portālā');
+  return sh.getRange(2, 1, sh.getLastRow() - 1, m >= 0 ? m + 1 : 1).getValues()
+    .filter(r => m < 0 || String(r[m]).trim().toLowerCase() !== 'nē')
+    .map(r => String(r[0]).trim()).filter(Boolean);
 }
 
 /** Pieslēgšanās tikai ar paroli: lapa "Kurjeri", kolonna "Parole" (izveido, ja nav). Atgriež kurjera nosaukumu */
@@ -406,27 +409,44 @@ function setLists(p) {
   finally { lock.releaseLock(); }
 }
 function setList_(name, spec) {
+  // Portāla saraksts → lapa. NEKAD netīra lapu: atjauno rindas pēc atslēgas (1. kolonna), jaunās pievieno beigās.
+  // Rindas, kuru portālā vairs nav, paliek (atzīme «Portālā: nē»); tām notīra tikai paroli/PIN, lai piekļuve beidzas.
+  // Tukša vērtība no portāla nepārraksta esošo. Aizsardzība: tukšs vai > 50 % sarucis saraksts → atteikums.  © VAITKEVIX, SIA
   const ss = SS_();
   const sh = ss.getSheetByName(name) || ss.insertSheet(name);
-  const cols = spec.cols || [], rows = spec.rows || [];
-  let lc = Math.max(1, sh.getLastColumn());
-  const head = sh.getRange(1, 1, 1, lc).getDisplayValues()[0].map(h => String(h).trim());
-  if (!head[0]) { head[0] = cols[0]; sh.getRange(1, 1).setValue(cols[0]).setFontWeight('bold'); }
-  const idx = [0];
-  for (let j = 1; j < cols.length; j++) {
-    let c = head.findIndex(h => h.toLowerCase() === String(cols[j]).toLowerCase());
-    if (c < 0) { c = head.length; head.push(cols[j]); sh.getRange(1, c + 1).setValue(cols[j]).setFontWeight('bold'); }
-    idx.push(c);
+  const cols = spec.cols || [], rows = (spec.rows || []).filter(r => r && String(r[0] == null ? '' : r[0]).trim());
+  if (!cols.length || !rows.length) throw new Error(name + ': portāla saraksts ir tukšs — lapu nemainu');
+  {  // slēdzeni tur setLists
+    let lc = Math.max(1, sh.getLastColumn());
+    const head = sh.getRange(1, 1, 1, lc).getDisplayValues()[0].map(h => String(h).trim());
+    if (!head[0]) { head[0] = cols[0]; sh.getRange(1, 1).setValue(cols[0]).setFontWeight('bold'); }
+    const colIdx = (t) => { let c = head.findIndex(h => h.toLowerCase() === String(t).toLowerCase()); if (c < 0) { c = head.length; head.push(t); sh.getRange(1, c + 1).setValue(t).setFontWeight('bold'); } return c; };
+    const idx = [0]; for (let j = 1; j < cols.length; j++) idx.push(colIdx(cols[j]));
+    const cMark = colIdx('Portālā');
+    lc = head.length;
+    const norm = s => String(s == null ? '' : s).replace(/\s+/g, ' ').trim().toLowerCase();
+    const last = sh.getLastRow();
+    const data = last > 1 ? sh.getRange(2, 1, last - 1, lc).getValues() : [];
+    data.forEach(r => { while (r.length < lc) r.push(''); });
+    const at = {}; data.forEach((r, i) => { const k = norm(r[0]); if (k && at[k] == null) at[k] = i; });
+    const had = Object.keys(at).length, inc = {};
+    rows.forEach(r => inc[norm(r[0])] = 1);
+    if (had >= 10 && Object.keys(inc).length < had * 0.5) throw new Error(name + ': portālā ' + Object.keys(inc).length + ' rindas, lapā ' + had + ' — pārāk liela starpība, lapu nemainu');
+    const secret = idx.filter((c, j) => /parole|pin/i.test(String(cols[j])));
+    rows.forEach(r => {
+      const k = norm(r[0]); let i = at[k];
+      if (i == null) { i = data.length; data.push(new Array(lc).fill('')); at[k] = i; }
+      const b = data[i];
+      idx.forEach((c, j) => { const v = r[j]; if (v == null || String(v).trim() === '') { if (j === 0) b[c] = v; return; } b[c] = v; });
+      b[cMark] = 'jā';
+    });
+    Object.keys(at).forEach(k => { if (inc[k]) return; const b = data[at[k]]; b[cMark] = 'nē'; secret.forEach(c => b[c] = ''); });
+    if (data.length) {
+      const write = idx.concat([cMark]).filter((c, i, a) => a.indexOf(c) === i);
+      write.forEach(c => sh.getRange(2, c + 1, data.length, 1).setNumberFormat('@').setValues(data.map(r => [r[c] == null ? '' : r[c]])));
+    }
+    return rows.length;
   }
-  lc = head.length;
-  const norm = s => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
-  const last = sh.getLastRow();
-  const cur = last > 1 ? sh.getRange(2, 1, last - 1, lc).getValues() : [];
-  const map = {}; cur.forEach(r => { const k = norm(r[0]); if (k && !map[k]) map[k] = r; });
-  const outRows = rows.map(r => { const b = (map[norm(r[0])] || new Array(lc).fill('')).slice(); while (b.length < lc) b.push(''); idx.forEach((c, j) => { b[c] = r[j] == null ? '' : r[j]; }); return b; });
-  if (last > 1) sh.getRange(2, 1, last - 1, lc).clearContent();
-  if (outRows.length) { sh.getRange(2, 1, outRows.length, lc).setNumberFormat('@').setValues(outRows); }
-  return outRows.length;
 }
 
 
