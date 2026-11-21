@@ -896,7 +896,7 @@
     .lock .ic{animation:none!important}
   </style>
 
-<!--SH-THEME--><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap"><link rel="stylesheet" href="sh-theme.css?v=1"><script>document.documentElement.setAttribute("data-sh","kais")</script><!--/SH-THEME-->
+<!--SH-THEME--><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap"><link rel="stylesheet" href="sh-theme.css?v=2"><script>/*SH tēma: kopīga ar portālu (sh_theme), mainās uzreiz*/(function(d){d.setAttribute("data-sh","kais");function a(t){d.setAttribute("data-theme",t==="dark"?"dark":"light")}try{a(localStorage.getItem("sh_theme"))}catch(e){}addEventListener("storage",function(e){if(e.key==="sh_theme")a(e.newValue)});addEventListener("message",function(e){var m=e.data;if(e.origin===location.origin&&m&&m.sh==="theme")a(m.t)})})(document.documentElement)</script><!--/SH-THEME-->
 </head>
 <body>
 <canvas id="flakes"></canvas>
@@ -906,7 +906,7 @@
   <div class="topbar-inner">
     <div class="brand-row">
       <div class="logo">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M3.3 7l17.4 10M3.3 17 20.7 7"/><path d="m9.5 3.5 2.5 2 2.5-2M9.5 20.5l2.5-2 2.5 2M3.6 10.4l3.1-.4-1.2-2.9M20.4 13.6l-3.1.4 1.2 2.9M3.6 13.6l3.1.4-1.2 2.9M20.4 10.4l-3.1-.4 1.2-2.9"/></svg>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.00 12.00L12.00 2.50M12.00 7.25L9.88 5.13M12.00 7.25L14.12 5.13M12.00 12.00L3.77 7.25M7.89 9.62L4.99 10.40M7.89 9.62L7.11 6.73M12.00 12.00L3.77 16.75M7.89 14.38L7.11 17.27M7.89 14.38L4.99 13.60M12.00 12.00L12.00 21.50M12.00 16.75L14.12 18.87M12.00 16.75L9.88 18.87M12.00 12.00L20.23 16.75M16.11 14.38L19.01 13.60M16.11 14.38L16.89 17.27M12.00 12.00L20.23 7.25M16.11 9.62L16.89 6.73M16.11 9.62L19.01 10.40"/></svg>
       </div>
       <div class="brand-text">
         <h1>Kaisāmmateriāl<span class="t-short">s</span><span class="t-long">a piegāde</span></h1>
@@ -1249,14 +1249,13 @@
   // ---------- Tēma ----------
   (function initTheme(){
     let t = null;
-    try { t = localStorage.getItem('theme'); } catch(e){}
-    if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', t);
+    try { t = localStorage.getItem('sh_theme'); } catch(e){}   // kopīga ar SH portālu; bez atslēgas — gaišā
+    document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light');
   })();
   function toggleTheme(){
     const t = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', t);
-    try { localStorage.setItem('theme', t); } catch(e){}
+    try { localStorage.setItem('sh_theme', t); } catch(e){}
   }
 
   // ---------- Sniegs fonā + sāls/smilšu graudu efekts ----------
