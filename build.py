@@ -61,24 +61,19 @@ addon = open('sh-addon.js', encoding='utf-8').read()
 ver = hashlib.sha1(addon.encode()).hexdigest()[:8]
 shx = '''<script>
 window.SHX = {
-  app: 'kais', title: 'Kaisāmmateriāla piegāde', api: 'https://aizvietosana-api.vaitkevix.workers.dev', icon: 'icon.png',
-  sub: 'Ievadiet savu PIN kodu vai kurjera paroli',
-  hint: 'Pieteicēji — tas pats PIN, kas Aizvietošanā. Kurjeri — sava parole.',
-  tabSel: '#tabs .tab', ownMenu: '.actions', a2hs: true,
-  tabsFor: function (u) { return u.kind === 'admin' ? ['new-task', 'task-list', 'carrier', 'analytics'] : u.kind === 'kurjers' ? ['carrier', 'task-list'] : ['new-task', 'task-list', 'analytics']; },
-  homeTab: function (u) { return u.kind === 'kurjers' ? 'carrier' : 'new-task'; },
+  app: 'kais', title: 'Jauns pieteikums', api: 'https://aizvietosana-api.vaitkevix.workers.dev', icon: 'icon.png',
+  sub: 'Lai pieteiktu, ievadiet savu PIN kodu', hint: 'Tas pats PIN, kas Aizvietošanā.',
+  gateIn: '#new-task', ownMenu: '.actions', a2hs: true,
+  homeTab: function (k) { return k === 'kurjers' ? 'carrier' : 'new-task'; },
+  tourKind: function (u) { return state.tab === 'carrier' && state.unlocked ? 'kurjers' : (u && u.kind === 'admin' ? 'admin' : 'pieteicejs'); },
+  loggedIn: function () { return !!state.unlocked; },
   switchTab: function (t) { switchTab(t); },
-  onOut: function () { try { sessionStorage.removeItem('carrierOk'); } catch (e) {} },
-  onUser: function (u) {
-    if ((u.kind === 'kurjers' || u.kind === 'admin') && !state.unlocked) { state.unlocked = true; try { sessionStorage.setItem('carrierOk', '1'); renderCarrierList(); } catch (e) {} }
-    if (u.kind === 'kurjers') { if (state.tab !== 'carrier') switchTab('carrier'); shxSia(); }
-    else shxReq(u);
-    if (typeof moveTabInd === 'function') setTimeout(moveTabInd, 50);
-  },
+  onUser: function (u) { shxReq(u); },
+  onOut: function () { shxCourierOut(); },
   tours: {
     pieteicejs: [
       { title: 'Sveiki!', text: 'Īsa pamācība, kā pieteikt kaisāmmateriālu. Aizņems pusminūti.' },
-      { sel: '#tabs', title: 'Cilnes', text: 'Jauns — pieteikt piegādi. Saraksts — visi pieteikumi un statuss. Statistika — kopsavilkums.' },
+      { sel: '#tabs', title: 'Cilnes', text: 'Jauns — pieteikt piegādi. Saraksts — visi pieteikumi un statuss. Kurjers — kurjeriem. Statistika — kopsavilkums.' },
       { sel: '#ac', tab: 'new-task', title: 'Adrese', text: 'Sāciet rakstīt adresi un izvēlieties no saraksta.' },
       { sel: '#requester', tab: 'new-task', title: 'Pasūtītājs', text: 'Jūsu vārds ir aizpildīts automātiski.' },
       { sel: '#matPick', tab: 'new-task', title: 'Materiāls', text: 'Sāls, smilts vai mix.' },
@@ -93,36 +88,48 @@ window.SHX = {
       { title: 'Sveiki!', text: 'Īsa pamācība kurjeram. Aizņems pusminūti.' },
       { sel: '#carrierContainer', tab: 'carrier', title: 'Jūsu piegādes', text: 'Šeit ir visi gaidošie pieteikumi.' },
       { sel: '#carrierContainer .task, #carrierContainer', tab: 'carrier', title: 'Atzīmēt piegādātu', text: 'Jūsu uzņēmums jau ir izvēlēts. Norādiet daudzumu, pievienojiet bildi un spiediet Piegādāts.' },
-      { sel: '[data-tab="task-list"]', title: 'Saraksts', text: 'Visi pieteikumi un to vēsture.' },
       { sel: '.shx-help', tab: 'carrier', title: 'Izvēlne', text: 'Pamācība, pievienošana sākuma ekrānam un iziešana.' },
       { title: 'Viss gatavs!', text: 'Veiksmīgu darbu!' }
     ]
   }
 };
-window.SHX.tours.admin = window.SHX.tours.pieteicejs.slice(0, -2).concat([
-  { sel: '[data-tab="carrier"]', title: 'Kurjers', text: 'Kurjeru skats — atzīmē piegādātos pieteikumus.' },
-  { sel: '[data-tab="analytics"]', title: 'Statistika', text: 'Kopsavilkums pa mēnešiem un materiāliem.' }
-]).concat(window.SHX.tours.pieteicejs.slice(-2));
+window.SHX.tours.admin = window.SHX.tours.pieteicejs;
 function shxReq(u) {
-  var sel = document.getElementById('requester'); if (!sel) return;
+  var sel = document.getElementById('requester'); if (!sel || !u) return;
   var n = String(u.name || '').toLowerCase(), opts = [].slice.call(sel.options);
   var o = opts.find(function (x) { return x.value.toLowerCase() === n; }) || opts.find(function (x) { return x.value && x.value.toLowerCase().indexOf(n) === 0; });
   if (!o && sel.options.length > 1) { o = new Option(u.name, u.name); sel.add(o); }
   if (o) sel.value = o.value;
   sel.disabled = u.kind !== 'admin' && !!o;
 }
-/* Kurjeram uzņēmums katrā pieteikumā jau izvēlēts */
+/* Kurjers: tikai sava uzņēmuma (SIA) parole; uzņēmums katrā pieteikumā jau izvēlēts */
+function shxCourier() { try { return localStorage.getItem('shx_kais_courier') || ''; } catch (e) { return ''; } }
 function shxSia() {
-  var u = window.SHXR && SHXR.user(); if (!u || u.kind !== 'kurjers') return;
+  var c = shxCourier(); if (!c || !state.unlocked) return;
   document.querySelectorAll('#carrierContainer select[id^="sia_"]').forEach(function (s) {
-    if (![].some.call(s.options, function (o) { return o.value === u.name; })) s.add(new Option(u.name, u.name));
-    if (s.value !== u.name) s.value = u.name; s.disabled = true;
+    if (![].some.call(s.options, function (o) { return o.value === c; })) s.add(new Option(c, c));
+    if (s.value !== c) s.value = c; s.disabled = true;
   });
 }
+function shxCourierOut() { try { localStorage.removeItem('shx_kais_courier'); sessionStorage.removeItem('carrierOk'); } catch (e) {} state.unlocked = false; try { renderCarrierList(); } catch (e) {} }
+var shxOldPin = window.checkCarrierPin;
+window.checkCarrierPin = function () {
+  var inp = document.getElementById('carrierPinInput'), pw = inp.value.trim(); if (!pw) return inp.focus();
+  SHXR.who(pw).then(function (u) {
+    if (u.kind !== 'kurjers') throw new Error('Ievadiet sava uzņēmuma (SIA) paroli');
+    try { localStorage.setItem('shx_kais_courier', u.name); sessionStorage.setItem('carrierOk', '1'); } catch (e) {}
+    state.unlocked = true; renderCarrierList(); SHXR.maybeTourKind('kurjers');
+  }).catch(function (err) {
+    if (err.message === 'Nepareizs PIN') return shxOldPin();   // pagaidām der arī vecā kopējā parole
+    var card = document.getElementById('lockCard'); if (card) { card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake'); }
+    inp.value = ''; toast(/fetch|network/i.test(err.message) ? 'Nav interneta' : err.message, 'err');
+  });
+};
 (function () {
+  try { if (shxCourier()) { state.unlocked = true; } } catch (e) {}
   var cc = document.getElementById('carrierContainer'); if (cc) new MutationObserver(shxSia).observe(cc, { childList: true, subtree: true });
-  var sd = window.setupDropdowns; if (sd) window.setupDropdowns = function () { var r = sd.apply(this, arguments); var u = window.SHXR && SHXR.user(); if (u && u.kind !== 'kurjers') shxReq(u); return r; };
-  var f = document.getElementById('taskForm'); if (f) f.addEventListener('reset', function () { setTimeout(function () { var u = window.SHXR && SHXR.user(); if (u && u.kind !== 'kurjers') shxReq(u); }, 0); });
+  var sd = window.setupDropdowns; if (sd) window.setupDropdowns = function () { var r = sd.apply(this, arguments); shxReq(SHXR.user()); return r; };
+  var f = document.getElementById('taskForm'); if (f) f.addEventListener('reset', function () { setTimeout(function () { shxReq(SHXR.user()); }, 0); });
 })();
 </script>
 <script src="sh-addon.js?v=%s"></script>

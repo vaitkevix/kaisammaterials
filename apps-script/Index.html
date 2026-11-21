@@ -1489,7 +1489,7 @@
     document.getElementById('qtyOrder').addEventListener('input', updateKgHint);
     updateKgHint();
     renderMatPick();
-    try { state.unlocked = sessionStorage.getItem('carrierOk') === '1'; } catch(e){}
+    try { state.unlocked = sessionStorage.getItem('carrierOk') === '1' || !!localStorage.getItem('shx_kais_courier'); } catch(e){}
     renderHeroStatic();
     renderSkeletons();
     moveTabInd();
@@ -2057,7 +2057,7 @@
         <div class="card lock" id="lockCard">
           <div class="ic">${IC.lock}</div>
           <h3>Pieeja kurjeriem</h3>
-          <p>Ievadiet paroli, lai redzētu gaidošās piegādes.</p>
+          <p>Ievadiet sava uzņēmuma (SIA) paroli, lai redzētu gaidošās piegādes.</p>
           <input type="password" class="input" id="carrierPinInput" autocapitalize="characters" autocomplete="current-password" placeholder="Parole" onkeydown="if(event.key==='Enter')checkCarrierPin()">
           <button class="btn btn-primary btn-block" onclick="checkCarrierPin()">Pieslēgties</button>
         </div>`;
