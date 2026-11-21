@@ -115,6 +115,20 @@ function getList_(name) {
     .filter(Boolean);
 }
 
+/** Pieslēgšanās tikai ar paroli: lapa "Kurjeri", kolonna "Parole" (izveido, ja nav). Atgriež kurjera nosaukumu */
+function courierByPassword(pw) {
+  const p = String(pw == null ? '' : pw).trim().toUpperCase(); if (!p) return '';
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.couriers); if (!sh) return '';
+  const lc = Math.max(1, sh.getLastColumn());
+  const head = sh.getRange(1, 1, 1, lc).getValues()[0].map(h => String(h).trim());
+  let c = head.findIndex(h => /^parole/i.test(h));
+  if (c < 0) { sh.getRange(1, lc + 1).setValue('Parole').setFontWeight('bold'); Utilities.sleep(800); return ''; }
+  const rows = sh.getLastRow() < 2 ? [] : sh.getRange(2, 1, sh.getLastRow() - 1, lc).getValues();
+  const m = rows.filter(r => String(r[0]).trim() && String(r[c]).trim().toUpperCase() === p);
+  if (m.length === 1) return String(m[0][0]).trim();
+  Utilities.sleep(800); return '';
+}
+
 // Pasūtītāju tālruņi: lapa "Pasutitaji", A = vārds, B = tālrunis
 function getPhones_() {
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.requesters);
@@ -298,7 +312,7 @@ function completeTask(data) {
 //  Lietotne (GitHub) → Cloudflare Worker → šeit. Google tabula paliek galvenā.
 //  Script properties: BRIDGE_KEY (tā pati atslēga, kas Cloudflare).
 // ================================================================
-const BRIDGE_MAP_ = { getTasks: getTasks, getInitialData: getInitialData, saveTask: saveTask, completeTask: completeTask, saveFileToDrive: saveFileToDrive };
+const BRIDGE_MAP_ = { getTasks: getTasks, getInitialData: getInitialData, saveTask: saveTask, completeTask: completeTask, saveFileToDrive: saveFileToDrive, courierByPassword: courierByPassword };
 
 function doPost(e) {
   const out = (o) => ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
