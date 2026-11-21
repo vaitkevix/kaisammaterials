@@ -39,10 +39,8 @@ const TASK_HEADERS = [
 
 // ---------- Web lietotne ----------
 function doGet() {
-  return HtmlService.createHtmlOutputFromFile('Index')
-    .setTitle('Kaisāmmateriāla piegāde')
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  // Vecā saite slēgta: lietotne darbojas tikai portālā. HtmlService netiek lietots — tātad nav arī google.script.run.
+  return ContentService.createTextOutput('SH | Kaisāmmateriāls — lietotne pārcelta: https://vaitkevix.cloud/sh/#kais · © VAITKEVIX, SIA');
 }
 
 // Izpilda formatēšanu, bet neaptur skriptu, ja lapa ir Google Sheets "tabula"
