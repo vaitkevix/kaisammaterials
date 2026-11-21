@@ -89,7 +89,7 @@ function setupSheets() {
   safe_(() => t.getRange(1, 1, 1, TASK_HEADERS.length).setValues([TASK_HEADERS]));
   safe_(() => t.getRange(1, 1, 1, TASK_HEADERS.length).setFontWeight('bold').setBackground('#dbe8f3'));
 
-  const cnt = name => Math.max(0, ss.getSheetByName(name).getLastRow() - 1);
+  const cnt = name => listCol1_(ss.getSheetByName(name)).length;
   const phones = Object.keys(getPhones_()).length;
   const lines = [
     'Adreses: ' + cnt(SHEETS.addresses),
@@ -405,7 +405,7 @@ function getLists() { const o = {}; ['Adreses', 'Pasutitaji', 'Kurjeri', 'Materi
 /** p = { lapa: { cols: ['Adrese', 'Piekļuve'], rows: [[...]] } } — 1. kolonna ir atslēga (kolonna A), pārējās pēc virsraksta; citas kolonnas paliek */
 function setLists(p) {
   const lock = LockService.getScriptLock(); lock.waitLock(30000);
-  try { const out = {}; Object.keys(p || {}).forEach(n => out[n] = setList_(n, p[n])); SpreadsheetApp.flush(); return out; }
+  try { const out = {}; Object.keys(p || {}).forEach(n => { try { out[n] = setList_(n, p[n]); } catch (e) { Logger.log(e.message); out[n] = { error: e.message }; } }); SpreadsheetApp.flush(); return out; }
   finally { lock.releaseLock(); }
 }
 function setList_(name, spec) {
@@ -415,7 +415,7 @@ function setList_(name, spec) {
   const ss = SS_();
   const sh = ss.getSheetByName(name) || ss.insertSheet(name);
   const cols = spec.cols || [], rows = (spec.rows || []).filter(r => r && String(r[0] == null ? '' : r[0]).trim());
-  if (!cols.length || !rows.length) throw new Error(name + ': portāla saraksts ir tukšs — lapu nemainu');
+  if (!cols.length) throw new Error(name + ': nav kolonnu');
   {  // slēdzeni tur setLists
     let lc = Math.max(1, sh.getLastColumn());
     const head = sh.getRange(1, 1, 1, lc).getDisplayValues()[0].map(h => String(h).trim());
@@ -429,15 +429,15 @@ function setList_(name, spec) {
     const data = last > 1 ? sh.getRange(2, 1, last - 1, lc).getValues() : [];
     data.forEach(r => { while (r.length < lc) r.push(''); });
     const at = {}; data.forEach((r, i) => { const k = norm(r[0]); if (k && at[k] == null) at[k] = i; });
-    const had = Object.keys(at).length, inc = {};
+    const had = Object.keys(at).filter(k => norm(data[at[k]][cMark]) !== 'nē').length, inc = {};
     rows.forEach(r => inc[norm(r[0])] = 1);
-    if (had >= 10 && Object.keys(inc).length < had * 0.5) throw new Error(name + ': portālā ' + Object.keys(inc).length + ' rindas, lapā ' + had + ' — pārāk liela starpība, lapu nemainu');
+    if ((had >= 10 && Object.keys(inc).length < had * 0.5) || (had >= 3 && !rows.length)) throw new Error(name + ': portālā ' + Object.keys(inc).length + ' rindas, lapā ' + had + ' — pārāk liela starpība, lapu nemainu');
     const secret = idx.filter((c, j) => /parole|pin/i.test(String(cols[j])));
     rows.forEach(r => {
       const k = norm(r[0]); let i = at[k];
       if (i == null) { i = data.length; data.push(new Array(lc).fill('')); at[k] = i; }
       const b = data[i];
-      idx.forEach((c, j) => { const v = r[j]; if (v == null || String(v).trim() === '') { if (j === 0) b[c] = v; return; } b[c] = v; });
+      idx.forEach((c, j) => { const v = r[j]; if ((v == null || String(v).trim() === '') && secret.indexOf(c) < 0) return; b[c] = v == null ? '' : v; });
       b[cMark] = 'jā';
     });
     Object.keys(at).forEach(k => { if (inc[k]) return; const b = data[at[k]]; b[cMark] = 'nē'; secret.forEach(c => b[c] = ''); });
