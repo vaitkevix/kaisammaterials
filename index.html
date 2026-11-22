@@ -16,7 +16,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="preconnect" href="https://aizvietosana-api.vaitkevix.workers.dev">
   <script>
-  /* Ātrā versija: google.script.run → Cloudflare (Google tabula paliek galvenā). © VAITKEVIX, SIA */
+  /* Ātrā versija: google.script.run → Cloudflare (dati Cloudflare D1, bez Google). © VAITKEVIX, SIA */
   (function () {
     var API = 'https://aizvietosana-api.vaitkevix.workers.dev/kais';
     function call(fn, args, ok, fail, uo) {
@@ -871,6 +871,7 @@
     :root[data-theme="dark"] .pill.pending{color:#f0b35a!important}
     :root[data-theme="dark"] .pill.done{color:#5fd08a!important}
     .seg,.kind-filter,#filterSeg{border-radius:10px!important;padding:4px}
+    .xl-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 16px;border:0;border-radius:999px;background:var(--ink,#17201c);color:var(--bg,#fff);font:inherit;font-weight:800;font-size:14px;cursor:pointer;flex:none}.xl-btn:disabled{opacity:.5}
     .seg button,.kind-filter button,#filterSeg button{border-radius:7px!important;min-height:36px}
     .stat .badge{display:none!important}
     .stat{padding:16px!important}
@@ -1083,6 +1084,9 @@
         <button data-f="pending" onclick="setFilter('pending')">Gaida</button>
         <button data-f="done" onclick="setFilter('done')">Piegādāti</button>
       </div>
+      <button class="xl-btn" id="xlBtn" onclick="exportXlsx()" title="Lejupielādēt redzamos pieteikumus Excel failā">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Excel
+      </button>
     </div>
     <div class="list" id="tasksContainer"></div>
   </section>
@@ -1885,6 +1889,45 @@
 
   function emptyState(icon, title, text){
     return `<div class="card empty"><div class="ic">${icon}</div><b>${title}</b>${text}</div>`;
+  }
+
+  // ---------- Excel (agrāk Google tabula «Kaisāmmateriāls · Pieteikumi») ----------
+  function loadX(){ return window.ExcelJS ? Promise.resolve() : new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js'; s.onload = res; s.onerror = () => rej(new Error('Neizdevās ielādēt Excel bibliotēku')); document.head.appendChild(s); }); }
+  async function exportXlsx(){
+    const btn = document.getElementById('xlBtn'); btn.disabled = true;
+    try {
+      await loadX();
+      const list = visibleTasks();
+      const wb = new ExcelJS.Workbook(); wb.creator = 'SH | Kaisāmmateriāls · © VAITKEVIX, SIA';
+      const ws = wb.addWorksheet('Pieteikumi', { views: [{ state: 'frozen', ySplit: 1 }] });
+      ws.columns = [['ID', 17], ['Datums', 16], ['Adrese', 34], ['Pasūtītājs', 20], ['Materiāls', 16], ['Pasūtīti maisi', 10], ['Pasūtīts (kg)', 11], ['Komentārs', 30], ['Statuss', 14],
+        ['Kurjers', 20], ['Piegādāti maisi', 10], ['Piegādāts (kg)', 11], ['Kurjera komentārs', 30], ['Piegādes laiks', 16], ['Bilde (pieteikums)', 18], ['Bilde (pēc piegādes)', 18]].map(([header, width]) => ({ header, width }));
+      const n = (v) => { const x = parseFloat(String(v || '').replace(',', '.')); return isNaN(x) ? null : x; };
+      list.forEach(t => { const a = n(t.bagsEst), b = n(t.m3Hauled);
+        const r = ws.addRow([t.id, t.date, t.address, t.requester, t.material, a, a == null ? null : a * BAG_KG, t.comment, t.status, t.sia, b, b == null ? null : b * BAG_KG, t.carrierComment, t.deliveredAt,
+          t.photoBefore ? { text: 'Bilde', hyperlink: t.photoBefore } : '', t.photoAfter ? { text: 'Bilde', hyperlink: t.photoAfter } : '']);
+        [15, 16].forEach(c => { if (r.getCell(c).value) r.getCell(c).font = { color: { argb: 'FF1F5FBF' }, underline: true }; }); });
+      const h = ws.getRow(1); h.font = { bold: true, color: { argb: 'FFFFFFFF' } }; h.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF17201C' } }; h.height = 22;
+      const last = ws.rowCount + 2;
+      ws.getCell('E' + last).value = 'Kopā'; ws.getCell('E' + last).font = { bold: true };
+      ws.getCell('F' + last).value = { formula: 'SUM(F2:F' + (last - 2) + ')' }; ws.getCell('G' + last).value = { formula: 'SUM(G2:G' + (last - 2) + ')' };
+      ws.getCell('K' + last).value = { formula: 'SUM(K2:K' + (last - 2) + ')' }; ws.getCell('L' + last).value = { formula: 'SUM(L2:L' + (last - 2) + ')' };
+      ['F', 'G', 'K', 'L'].forEach(c => ws.getCell(c + last).font = { bold: true });
+      ws.autoFilter = { from: 'A1', to: 'P1' };
+      const buf = await wb.xlsx.writeBuffer(), d = new Date(), ymd = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+      a.download = 'Kaisammaterials-' + ymd + '.xlsx'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    } catch (e) { toast(e.message || 'Neizdevās izveidot Excel', 'error'); }
+    finally { btn.disabled = false; }
+  }
+  function visibleTasks(){
+    const qs = state.q.trim().toLowerCase();
+    return state.tasks.filter(t => {
+      if (state.filter === 'pending' && isDone(t)) return false;
+      if (state.filter === 'done' && !isDone(t)) return false;
+      if (!qs) return true;
+      return [t.id, t.address, t.requester, t.material, t.comment, t.sia].join(' ').toLowerCase().includes(qs);
+    });
   }
 
   // ---------- Saraksts ----------
