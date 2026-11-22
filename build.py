@@ -3,7 +3,7 @@
 import re
 app = open('apps-script/Index.html', encoding='utf-8').read()
 old = open('apps-script/wrapper-old.html', encoding='utf-8').read()
-API = 'https://aizvietosana-api.vaitkevix.workers.dev/kais'
+API = 'https://vaitkevix.cloud/sh/api/kais'
 
 head = '''
   <title>SH | Kaisāmmateriāls</title>
@@ -17,9 +17,9 @@ head = '''
   <link rel="icon" type="image/png" sizes="64x64" href="favicon.png?v=2">
   <link rel="mask-icon" href="safari-pinned-tab.svg" color="#e07a1f">
   <link rel="manifest" href="manifest.json">
-  <link rel="preconnect" href="https://aizvietosana-api.vaitkevix.workers.dev">
+  <link rel="preconnect" href="https://vaitkevix.cloud/sh/api">
   <script>
-  /* Ātrā versija: google.script.run → Cloudflare (Google tabula paliek galvenā). © VAITKEVIX, SIA */
+  /* Ātrā versija: google.script.run → Cloudflare (dati Cloudflare D1, bez Google). © VAITKEVIX, SIA */
   (function () {
     var API = '%s';
     function call(fn, args, ok, fail, uo) {
@@ -62,7 +62,7 @@ addon = open('sh-addon.js', encoding='utf-8').read()
 ver = hashlib.sha1(addon.encode()).hexdigest()[:8]
 shx = '''<style>@media(max-width:420px){.t-long{display:none}}@media(min-width:421px){.t-short{display:none}}</style><script>
 window.SHX = {
-  app: 'kais', title: 'Jauns pieteikums', api: 'https://aizvietosana-api.vaitkevix.workers.dev', icon: 'icon.png',
+  app: 'kais', title: 'Jauns pieteikums', api: 'https://vaitkevix.cloud/sh/api', icon: 'icon.png',
   sub: 'Lai pieteiktu, ievadiet savu PIN kodu', hint: 'Tas pats PIN, kas Aizvietošanā.',
   gateIn: '#new-task', ownMenu: '.actions', a2hs: true,
   homeTab: function (k) { return k === 'kurjers' ? 'carrier' : 'new-task'; },
