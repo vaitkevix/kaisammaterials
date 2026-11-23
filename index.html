@@ -1144,8 +1144,6 @@
 
 <script>
   // ================== IESTATĪJUMI ==================
-  // KURJERA PAROLE (nomainiet "1234" uz savu paroli)
-  const CARRIER_PIN = "RS1234";
   // Daudzumu skaita MAISOS. Viena maisa svars:
   const BAG_KG = 25;
   const UNIT = "maisi";
@@ -2149,9 +2147,8 @@
         <div class="card lock" id="lockCard">
           <div class="ic">${IC.lock}</div>
           <h3>Pieeja kurjeriem</h3>
-          <p>Ievadiet sava uzņēmuma (SIA) paroli, lai redzētu gaidošās piegādes.</p>
-          <input type="password" class="input" id="carrierPinInput" autocapitalize="characters" autocomplete="current-password" placeholder="Parole" onkeydown="if(event.key==='Enter')checkCarrierPin()">
-          <button class="btn btn-primary btn-block" onclick="checkCarrierPin()">Pieslēgties</button>
+          <p>Ieejiet SH portālā ar sava uzņēmuma (SIA) nosaukumu un paroli — tur atvērsies jūsu piegādes.</p>
+          <a class="btn btn-primary btn-block" href="/sh/" target="_top">Atvērt portālu</a>
         </div>`;
       return;
     }
@@ -2300,20 +2297,6 @@
     document.body.style.overflow = '';
   }
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDoc(); });
-
-  function checkCarrierPin(){
-    const inp = document.getElementById('carrierPinInput');
-    if (inp.value.trim().toUpperCase() === CARRIER_PIN){
-      state.unlocked = true;
-      try { sessionStorage.setItem('carrierOk', '1'); } catch(e){}
-      renderCarrierList();
-    } else {
-      const card = document.getElementById('lockCard');
-      card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake');
-      inp.value = '';
-      toast('Nepareiza parole', 'err');
-    }
-  }
 
   function submitTaskCompletion(r){
     const sia = document.getElementById('sia_' + r).value;
