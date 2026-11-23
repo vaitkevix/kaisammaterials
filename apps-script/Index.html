@@ -1494,6 +1494,11 @@
     updateKgHint();
     renderMatPick();
     try { state.unlocked = sessionStorage.getItem('carrierOk') === '1' || !!localStorage.getItem('shx_kais_courier'); } catch(e){}
+    try {   // ienācis portālā: administrators redz kurjeru cilni bez paroles, pārējiem tā nav vajadzīga
+      const pu = JSON.parse(localStorage.getItem('shx_kais_user') || 'null');
+      if (pu && pu.role === 'admin') state.unlocked = true;
+      else if (!state.unlocked && localStorage.getItem('sh_t')) { const tb = document.querySelector('.tab[data-tab="carrier"]'); if (tb) tb.style.display = 'none'; }
+    } catch(e){}
     renderHeroStatic();
     renderSkeletons();
     moveTabInd();
