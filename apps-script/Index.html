@@ -1854,6 +1854,14 @@
 
   // ---------- Excel (agrāk Google tabula «Kaisāmmateriāls · Pieteikumi») ----------
   function loadX(){ return window.ExcelJS ? Promise.resolve() : new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js'; s.onload = res; s.onerror = () => rej(new Error('Neizdevās ielādēt Excel bibliotēku')); document.head.appendChild(s); }); }
+  // Bilžu sīktēli Excel failam (pārlūkā samazina). © VAITKEVIX, SIA
+  const TH_ = {}, urlsOf = s => String(s || '').split(/\s+/).filter(u => /^https?:/.test(u));
+  function thumb(url, w){ const k = url + '|' + w;
+    return TH_[k] || (TH_[k] = (async () => { try { const r = await fetch(url.replace(/([?&]sz=)w\d+/, '$1w600')); if (!r.ok) return null;
+      const bm = await createImageBitmap(await r.blob()), sc = Math.min(1, w / bm.width), c = document.createElement('canvas');
+      c.width = Math.round(bm.width * sc); c.height = Math.round(bm.height * sc); c.getContext('2d').drawImage(bm, 0, 0, c.width, c.height);
+      return { data: c.toDataURL('image/jpeg', .72), w: c.width, h: c.height }; } catch(e){ return null; } })()); }
+  async function pool(list, n, fn){ let i = 0; await Promise.all(Array.from({ length: Math.min(n, list.length) }, async () => { while (i < list.length) await fn(list[i++]); })); }
   async function exportXlsx(){
     const btn = document.getElementById('xlBtn'); btn.disabled = true;
     try {
@@ -1864,10 +1872,18 @@
       ws.columns = [['ID', 17], ['Datums', 16], ['Adrese', 34], ['Pasūtītājs', 20], ['Materiāls', 16], ['Pasūtīti maisi', 10], ['Pasūtīts (kg)', 11], ['Komentārs', 30], ['Statuss', 14],
         ['Kurjers', 20], ['Piegādāti maisi', 10], ['Piegādāts (kg)', 11], ['Kurjera komentārs', 30], ['Piegādes laiks', 16], ['Bilde (pieteikums)', 18], ['Bilde (pēc piegādes)', 18]].map(([header, width]) => ({ header, width }));
       const n = (v) => { const x = parseFloat(String(v || '').replace(',', '.')); return isNaN(x) ? null : x; };
+      const need = [...new Set(list.flatMap(t => [urlsOf(t.photoBefore)[0], urlsOf(t.photoAfter)[0]]).filter(Boolean))], TT = {};
+      if (need.length) toast('Gatavo bildes Excel failam (' + need.length + ')…');
+      await pool(need, 8, async u => { TT[u] = await thumb(u, 320); });
       list.forEach(t => { const a = n(t.bagsEst), b = n(t.m3Hauled);
         const r = ws.addRow([t.id, t.date, t.address, t.requester, t.material, a, a == null ? null : a * BAG_KG, t.comment, t.status, t.sia, b, b == null ? null : b * BAG_KG, t.carrierComment, t.deliveredAt,
           t.photoBefore ? { text: 'Bilde', hyperlink: t.photoBefore } : '', t.photoAfter ? { text: 'Bilde', hyperlink: t.photoAfter } : '']);
-        [15, 16].forEach(c => { if (r.getCell(c).value) r.getCell(c).font = { color: { argb: 'FF1F5FBF' }, underline: true }; }); });
+        [15, 16].forEach(c => { if (r.getCell(c).value) r.getCell(c).font = { color: { argb: 'FF1F5FBF' }, underline: true }; });
+        let img = false; [[15, t.photoBefore], [16, t.photoAfter]].forEach(([c, v]) => { const u = urlsOf(v)[0], th = u && TT[u]; if (!th) return; img = true;
+          const hh = 84, ww = Math.min(124, Math.round(th.w / th.h * hh));
+          ws.addImage(wb.addImage({ base64: th.data, extension: 'jpeg' }), { tl: { col: c - 1 + .08, row: r.number - 1 + .08 }, ext: { width: ww, height: hh }, editAs: 'oneCell', hyperlinks: { hyperlink: u, tooltip: 'Atvērt bildi' } });
+          r.getCell(c).value = null; });
+        if (img) { r.height = 70; r.alignment = { vertical: 'top' }; } });
       const h = ws.getRow(1); h.font = { bold: true, color: { argb: 'FFFFFFFF' } }; h.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF17201C' } }; h.height = 22;
       const last = ws.rowCount + 2;
       ws.getCell('E' + last).value = 'Kopā'; ws.getCell('E' + last).font = { bold: true };
