@@ -1020,6 +1020,10 @@
       </div>
       <button type="submit" id="submitBtn" class="btn btn-primary btn-block">Nosūtīt pieteikumu</button>
     </form>
+    <details class="card" id="regCard" style="margin-top:16px;padding:16px 18px" ontoggle="if(this.open)regLoad()">
+      <summary style="cursor:pointer;font-weight:800">🔁 Sezonas pieteikumi <small style="font-weight:600;color:var(--ink-3)">· ziemā ik N dienas vai pēc sniega izsaukuma</small></summary>
+      <div id="regBody" style="margin-top:12px">Lādē…</div>
+    </details>
   </section>
 
   <!-- 2. PIETEIKUMI -->
@@ -1160,7 +1164,36 @@
     return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
   function isDone(t){ return t.status === 'Izpildīts' || t.status === 'Piegādāts'; }
-  function statusText(t){ return isDone(t) ? 'Piegādāts' : 'Gaida piegādi'; }
+  function isCancelled(t){ return t.status === 'Atcelts'; }
+  function statusText(t){ return isDone(t) ? 'Piegādāts' : isCancelled(t) ? 'Atcelts' : 'Gaida piegādi'; }
+  function meKais(){ try { return JSON.parse(localStorage.getItem('shx_kais_user') || 'null') || {}; } catch(e){ return {}; } }
+  const PROB_REASONS = ['Nav kur nolikt', 'Slēgts / nav piekļuves', 'Nav materiāla', 'Cits'];
+  function probHtml(t){
+    return (t.problem ? `<div class="note" style="border-left:3px solid var(--red,#dc2626)"><b>⚠ Problēma:</b> ${esc(t.problem)}${t.problemPhoto ? ` · <a href="${esc(t.problemPhoto)}" target="_blank">bilde</a>` : ''}</div>` : '')
+      + (t.cancelled && isCancelled(t) ? `<div class="note"><b>Atcelts:</b> ${esc(t.cancelled)}</div>` : '');
+  }
+  function probForm(t){
+    const r = t.rowIndex;
+    return `<details class="complete prob-d"><summary>${IC.x} Nevar piegādāt ${IC.chev}</summary><div class="body">
+      <div class="field"><span class="label">Iemesls</span><div class="reasons" style="display:grid;gap:6px">${PROB_REASONS.map((x, i) => `<label><input type="radio" name="pr_${r}" value="${esc(x)}" ${i ? '' : 'checked'}> ${esc(x)}</label>`).join('')}</div></div>
+      <div class="field"><label class="label" for="pc_${r}">Komentārs <span class="opt">· nav obligāti</span></label><textarea class="textarea" id="pc_${r}" placeholder="Piem., vārti slēgti, atbraukšu rīt"></textarea></div>
+      <div class="field"><span class="label">Bilde <span class="opt">· nav obligāti</span></span>${dropzone('p' + r)}</div>
+      <button class="btn btn-primary btn-block" id="probBtn_${r}" data-id="${esc(t.id)}" onclick="sendProblem(this.dataset.id, ${r})">Ziņot vadītājam</button></div></details>`;
+  }
+  function sendProblem(id, r){
+    const sel = document.querySelector('input[name="pr_' + r + '"]:checked'), btn = document.getElementById('probBtn_' + r);
+    if (processing > 0) return toast('Bilde vēl tiek apstrādāta, uzgaidiet', 'err');
+    setBusy(btn, true, 'Saglabā…');
+    google.script.run.withSuccessHandler(res => { if (res && res.status === 'success'){ delete photos['p' + r]; toast('Problēma saglabāta'); loadTasks(); } else { setBusy(btn, false, 'Ziņot vadītājam'); toast('Kļūda: ' + ((res && res.message) || 'nezināma kļūda'), 'err'); } })
+      .withFailureHandler(err => { setBusy(btn, false, 'Ziņot vadītājam'); toast('Kļūda: ' + err.message, 'err'); })
+      .reportProblem({ id, reason: sel ? sel.value : '', comment: (document.getElementById('pc_' + r) || {}).value || '', photo: photos['p' + r] || '' });
+  }
+  function canCancel(t){ const u = meKais(); return !isDone(t) && (u.role === 'admin' || (u.role === 'pieteicejs' && u.name === t.requester)); }
+  function cancelTask(id, undo){
+    const why = undo ? '' : (window.prompt('Kāpēc atcelt pieteikumu?', '') || '').trim(); if (!undo && !why) return;
+    google.script.run.withSuccessHandler(res => { if (res && res.status === 'success'){ toast(undo ? 'Atjaunots' : 'Atcelts'); loadTasks(); } else toast('Kļūda: ' + ((res && res.message) || 'nezināma kļūda'), 'err'); })
+      .withFailureHandler(err => toast('Kļūda: ' + err.message, 'err')).cancelTask({ id, reason: why, undo: !!undo });
+  }
   function num(v){ return parseFloat(String(v).replace(',', '.')) || 0; }
   function fmt(n, d){ return n.toLocaleString('lv-LV', {maximumFractionDigits: d || 0}); }
   // Maisu vārds ar pareizu galotni: 1 maiss, 21 maiss, 5 maisi
@@ -1666,7 +1699,7 @@
   }
 
   function renderAll(){
-    const pending = state.tasks.filter(t => !isDone(t)).length;
+    const pending = state.tasks.filter(t => !isDone(t) && !isCancelled(t)).length;
     document.getElementById('pendingCount').textContent = pending || '';
     renderHeroPending(pending);
     renderStats();
@@ -1900,7 +1933,7 @@
   function visibleTasks(){
     const qs = state.q.trim().toLowerCase();
     return state.tasks.filter(t => {
-      if (state.filter === 'pending' && isDone(t)) return false;
+      if (state.filter === 'pending' && (isDone(t) || isCancelled(t))) return false;
       if (state.filter === 'done' && !isDone(t)) return false;
       if (!qs) return true;
       return [t.id, t.address, t.requester, t.material, t.comment, t.sia].join(' ').toLowerCase().includes(qs);
@@ -1913,7 +1946,7 @@
     if (!state.loaded) return;
     const qs = state.q.trim().toLowerCase();
     const list = state.tasks.filter(t => {
-      if (state.filter === 'pending' && isDone(t)) return false;
+      if (state.filter === 'pending' && (isDone(t) || isCancelled(t))) return false;
       if (state.filter === 'done' && !isDone(t)) return false;
       if (!qs) return true;
       return [t.id, t.address, t.requester, t.material, t.comment, t.sia].join(' ').toLowerCase().includes(qs);
@@ -1944,9 +1977,12 @@
           ${metaItem(IC.bag, 'Pasūtīts', t.bagsEst !== '' && t.bagsEst != null ? q(ordered(t)) : '')}
         </div>
         ${t.comment ? `<div class="note">${esc(t.comment)}</div>` : ''}
+        ${probHtml(t)}
         <div class="links">
-          ${isDone(t) ? '' : callLink(t)}
+          ${isDone(t) || isCancelled(t) ? '' : callLink(t)}
           <a class="chip-link map" href="${mapsUrl(t.address)}" target="_blank">${IC.pin} Kartē</a>
+          ${canCancel(t) && !isCancelled(t) ? `<button type="button" class="chip-link" data-id="${esc(t.id)}" onclick="cancelTask(this.dataset.id)">${IC.x} Atcelt</button>` : ''}
+          ${isCancelled(t) && meKais().role === 'admin' ? `<button type="button" class="chip-link" data-id="${esc(t.id)}" onclick="cancelTask(this.dataset.id, true)">Atjaunot</button>` : ''}
           ${t.photoBefore ? `<a class="chip-link" href="${esc(t.photoBefore)}" target="_blank">${IC.cam} Bilde</a>` : ''}
         </div>
         ${isDone(t) ? `
@@ -2140,8 +2176,9 @@
       };
     });
 
-    const pending = state.tasks.filter(t => !isDone(t));
-    const docs = pickupHtml() + docCardsHtml();
+    let pending = state.tasks.filter(t => !isDone(t) && !isCancelled(t));
+    if (state.route && pending.length) pending = routeOrder(pending);
+    const docs = routeBar(pending) + pickupHtml() + docCardsHtml();
     if (!pending.length){
       box.innerHTML = docs + emptyState(IC.flakeBig, 'Viss piegādāts!', 'Šobrīd nav neviena gaidoša pieteikuma.');
       return;
@@ -2158,7 +2195,7 @@
             <h3 class="addr">${esc(t.address)}</h3>
             <div class="sub">${esc(t.id)} · ${esc(t.date)}</div>
           </div>
-          <span class="pill pending">${statusText(t)}</span>
+          ${state.route ? `<span class="pill pending">Nr. ${i + 1}</span>` : `<span class="pill pending">${statusText(t)}</span>`}
         </div>
         <div class="meta three">
           ${metaItem(IC.user, 'Pasūtītājs', t.requester)}
@@ -2167,10 +2204,12 @@
         </div>
         ${t.comment ? `<div class="note">${esc(t.comment)}</div>` : ''}
         ${acceptHtml(t)}
+        ${probHtml(t)}
         <div class="links">
           ${callLink(t)}
           ${pickupLinks(t)}
           <a class="chip-link map" href="${mapsUrl(t.address)}" target="_blank">${IC.pin} Navigēt</a>
+          <a class="chip-link" href="https://waze.com/ul?q=${encodeURIComponent(t.address)}&navigate=yes" target="_blank">Waze</a>
           ${t.photoBefore ? `<a class="chip-link" href="${esc(t.photoBefore)}" target="_blank">${IC.cam} Bilde</a>` : ''}
         </div>
         <details class="complete" data-r="${r}" ${openRows[r] ? 'open' : ''}>
@@ -2197,6 +2236,7 @@
             <button class="btn btn-primary btn-block" id="compBtn_${r}" onclick="submitTaskCompletion(${r})">Apstiprināt piegādi</button>
           </div>
         </details>
+        ${probForm(t)}
       </article>`;
     }).join('') + '</div>';
 
@@ -2210,6 +2250,74 @@
       const dz = document.getElementById('dz_' + k);
       if (dz){ dz.querySelector('img').src = photos[k]; dz.classList.add('has'); }
     });
+  }
+
+  // ---------- Dienas karte / secība: tuvākais kaimiņš no atrašanās vietas ----------
+  const GEO = { c: {}, here: null, busy: false };
+  function kmD(a, b){ const R = 6371, r = Math.PI / 180, dLa = (b[0] - a[0]) * r, dLo = (b[1] - a[1]) * r, x = Math.sin(dLa / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dLo / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(x)); }
+  function routeOrder(list){
+    const have = list.filter(t => GEO.c[t.address]), miss = list.filter(t => !GEO.c[t.address]), out = [];
+    let cur = GEO.here || (have[0] && GEO.c[have[0].address]); const left = have.slice(); state.routeKm = 0;
+    while (left.length){ let bi = 0, bd = 1e9; left.forEach((t, i) => { const d = kmD(cur, GEO.c[t.address]); if (d < bd){ bd = d; bi = i; } }); const t = left.splice(bi, 1)[0]; state.routeKm += bd; out.push(t); cur = GEO.c[t.address]; }
+    return out.concat(miss);
+  }
+  function routeStart(){
+    if (state.route){ state.route = false; return renderCarrierList(); }
+    state.route = true; state.routeI = 0; GEO.busy = true; renderCarrierList();
+    const need = [...new Set(state.tasks.filter(t => !isDone(t) && !isCancelled(t)).map(t => t.address))].filter(a => !(a in GEO.c));
+    const go = () => { const ch = need.splice(0, 5);   // Worker meklē ≤5 jaunas reizē (OpenStreetMap), pārējās — no keša
+      if (!ch.length){ GEO.busy = false; return renderCarrierList(); }
+      google.script.run.withSuccessHandler(res => { const c = (res && res.coords) || {}; ch.forEach(a => { GEO.c[a] = c[a] || null; }); renderCarrierList(); go(); })
+        .withFailureHandler(() => { GEO.busy = false; renderCarrierList(); }).geocodeAddresses(ch); };
+    try { navigator.geolocation.getCurrentPosition(p => { GEO.here = [p.coords.latitude, p.coords.longitude]; go(); }, go, { timeout: 8000, maximumAge: 60000 }); } catch(e){ go(); }
+  }
+  function routeBar(order){
+    if (!state.route) return `<button type="button" class="btn btn-block" style="margin-bottom:12px" onclick="routeStart()">${IC.pin} Dienas secība (tuvākā nākamā)</button>`;
+    if (!order.length) return '';
+    const i = Math.min(state.routeI || 0, order.length - 1), t = order[i];
+    return `<div class="card pk-card"><h4>${IC.truck} Dienas secība · ${order.length} adreses${state.routeKm ? ' · ~' + Math.round(state.routeKm * 1.3) + ' km' : ''}${GEO.busy ? ' · meklē kartē…' : ''}</h4>
+      <p style="margin:4px 0 10px">Nr. ${i + 1}: <b>${esc(t.address)}</b></p>
+      <div class="links"><a class="chip-link" href="https://waze.com/ul?q=${encodeURIComponent(t.address)}&navigate=yes" target="_blank">Waze</a>
+      <button type="button" class="chip-link" onclick="state.routeI=${(i + 1) % order.length};renderCarrierList()">Nākamais →</button>
+      <button type="button" class="chip-link" onclick="routeStart()">Izslēgt</button></div></div>`;
+  }
+
+  // ---------- Sezonas pieteikumi (Worker kais_reg) ----------
+  const MN = ['jan', 'feb', 'mar', 'apr', 'mai', 'jūn', 'jūl', 'aug', 'sep', 'okt', 'nov', 'dec'];
+  function regLoad(){ google.script.run.withSuccessHandler(regDraw).withFailureHandler(e => { document.getElementById('regBody').textContent = e.message; }).regList(); }
+  function regDraw(r){
+    const b = document.getElementById('regBody'); if (!b) return;
+    if (!r || r.status !== 'success'){ b.textContent = (r && r.message) || 'Nav pieejams'; return; }
+    state.reg = r.list || [];
+    const mo = (v) => MN.map((m, i) => `<option value="${i + 1}" ${i + 1 === v ? 'selected' : ''}>${m}</option>`).join('');
+    b.innerHTML = (state.reg.length ? state.reg.map(x => `<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line,#e5e7eb)">
+        <div style="min-width:0"><b style="display:block;overflow-wrap:anywhere">${esc(x.adrese)}</b><small style="color:var(--ink-3)">${x.ik ? 'ik ' + x.ik + ' d. · nākamais ' + esc(x.nakamais.split('-').reverse().join('.')) : ''}${x.ik && x.sniegs ? ' · ' : ''}${x.sniegs ? '❄ pēc sniega izsaukuma' : ''} · ${MN[x.no_men - 1]}–${MN[x.lidz_men - 1]} · ${esc(x.materials)}${x.maisi ? ' ' + esc(x.maisi) + ' m.' : ''}${x.aktivs ? '' : ' · <b>apturēts</b>'}</small></div>
+        <span style="display:flex;gap:6px;flex:none"><button type="button" class="chip-link" data-id="${esc(x.id)}" onclick="regEdit(this.dataset.id)">Labot</button><button type="button" class="chip-link" data-id="${esc(x.id)}" onclick="regToggle(this.dataset.id)">${x.aktivs ? 'Apturēt' : 'Ieslēgt'}</button></span></div>`).join('') : '<p style="color:var(--ink-3)">Vēl nav neviena.</p>')
+      + `<div id="regForm" style="margin-top:14px"><input type="hidden" id="rg_id">
+        <div class="field"><label class="label" for="rg_addr">Adrese</label><input class="input" id="rg_addr" list="rg_addrs" autocomplete="off"><datalist id="rg_addrs">${(state.addresses || []).map(a => '<option value="' + esc(a) + '">').join('')}</datalist></div>
+        <div class="grid-2"><div class="field"><label class="label" for="rg_ik">Ik dienas <span class="opt">· 0 = tikai pēc sniega</span></label><input class="input" id="rg_ik" type="number" min="0" max="90" value="14"></div>
+          <div class="field"><label class="label" for="rg_next">Nākamais</label><input class="input" id="rg_next" type="date"></div></div>
+        <div class="grid-2"><div class="field"><label class="label" for="rg_no">Sezona no</label><select class="select" id="rg_no">${mo(11)}</select></div><div class="field"><label class="label" for="rg_li">līdz</label><select class="select" id="rg_li">${mo(3)}</select></div></div>
+        <div class="grid-2"><div class="field"><label class="label" for="rg_mat">Materiāls</label><select class="select" id="rg_mat">${MATERIALS.map(m => '<option>' + esc(m) + '</option>').join('')}</select></div>
+          <div class="field"><label class="label" for="rg_mai">Maisi</label><input class="input" id="rg_mai" type="number" min="0" value="4"></div></div>
+        <label style="display:flex;gap:8px;align-items:center;margin:4px 0 14px;font-weight:700"><input type="checkbox" id="rg_sn"> ❄ Pieteikt automātiski pēc apstiprināta sniega izsaukuma</label>
+        <button type="button" class="btn btn-primary btn-block" id="rg_save" onclick="regSave()">Saglabāt</button></div>`;
+  }
+  function regEdit(id){
+    const x = (state.reg || []).find(r => r.id === id); if (!x) return; const S = (i, v) => { document.getElementById(i).value = v; };
+    S('rg_id', x.id); S('rg_addr', x.adrese); S('rg_ik', x.ik); S('rg_next', x.nakamais); S('rg_no', x.no_men); S('rg_li', x.lidz_men); S('rg_mat', x.materials); S('rg_mai', x.maisi);
+    document.getElementById('rg_sn').checked = !!x.sniegs; document.getElementById('regForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  function regSave(){
+    const g = (i) => document.getElementById(i).value, old = (state.reg || []).find(r => r.id === g('rg_id'));
+    const d = { id: g('rg_id'), adrese: g('rg_addr').trim(), ik: +g('rg_ik') || 0, nakamais: g('rg_next'), no_men: +g('rg_no'), lidz_men: +g('rg_li'), materials: g('rg_mat'), maisi: g('rg_mai'), sniegs: document.getElementById('rg_sn').checked, aktivs: old ? old.aktivs : 1 };
+    const btn = document.getElementById('rg_save'); btn.disabled = true;
+    google.script.run.withSuccessHandler(r => { if (r && r.status === 'success'){ toast('Saglabāts'); regDraw(r); } else { btn.disabled = false; toast('Kļūda: ' + ((r && r.message) || ''), 'err'); } })
+      .withFailureHandler(e => { btn.disabled = false; toast('Kļūda: ' + e.message, 'err'); }).regSave(d);
+  }
+  function regToggle(id){
+    const x = (state.reg || []).find(r => r.id === id); if (!x) return;
+    google.script.run.withSuccessHandler(r => { if (r && r.status === 'success') regDraw(r); else toast('Kļūda: ' + ((r && r.message) || ''), 'err'); }).withFailureHandler(e => toast(e.message, 'err')).regSave(Object.assign({}, x, { aktivs: x.aktivs ? 0 : 1 }));
   }
 
   // ---------- Dokumenti kurjeram ----------
