@@ -2166,6 +2166,7 @@
           ${metaItem(IC.bag, 'Pasūtīts', q(ordered(t)))}
         </div>
         ${t.comment ? `<div class="note">${esc(t.comment)}</div>` : ''}
+        ${acceptHtml(t)}
         <div class="links">
           ${callLink(t)}
           ${pickupLinks(t)}
@@ -2269,6 +2270,23 @@
   }
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDoc(); });
 
+  /* SIA kurjers: «Pieņemu» / «Nevaru šajā datumā» (Worker carrierAnswer; vadītājs saņem paziņojumu, ja nevar) */
+  function siaMode(){ try { return !!localStorage.getItem('shx_kais_courier') && !!localStorage.getItem('sh_t'); } catch(e){ return false; } }
+  function acceptHtml(t){
+    const dec = t.declined ? /^(.*?) · (\d\d\.\d\d\.\d{4} \d\d:\d\d) · ([\s\S]*)$/.exec(t.declined) : null;
+    const info = (t.accepted ? `<div class="note"><b>✓ Pieņēma:</b> ${esc(t.accepted)}</div>` : '') + (t.declined ? `<div class="note"><b>Nevar šajā datumā${dec ? ' · ' + esc(dec[1]) + ' · ' + esc(dec[2]) : ''}:</b> ${esc(dec ? dec[3] : t.declined)}</div>` : '');
+    if (!siaMode()) return info;
+    const id = esc(t.id);
+    return info + `<div class="links">${t.accepted ? '' : `<button type="button" class="btn btn-primary" data-id="${id}" onclick="carrierAnswer(this.dataset.id, true)">Pieņemu</button>`}<button type="button" class="btn" data-id="${id}" onclick="carrierAnswer(this.dataset.id, false)">Nevaru šajā datumā</button></div>`;
+  }
+  function carrierAnswer(id, ok){
+    let reason = '';
+    if (!ok){ reason = (window.prompt('Kāpēc nevarat šajā datumā? (vadītājs saņems paziņojumu)', '') || '').trim(); if (!reason) return; }
+    google.script.run
+      .withSuccessHandler(res => { if (res && res.status === 'success'){ toast(ok ? 'Pieņemts ✓' : 'Vadītājam paziņots'); loadTasks(); } else toast('Kļūda: ' + ((res && res.message) || 'nezināma kļūda'), 'err'); })
+      .withFailureHandler(err => toast('Kļūda: ' + err.message, 'err'))
+      .carrierAnswer({ id: id, ok: !!ok, reason: reason.slice(0, 200) });
+  }
   function submitTaskCompletion(r){
     const sia = document.getElementById('sia_' + r).value;
     const qty = document.getElementById('qty_' + r).value;
